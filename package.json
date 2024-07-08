@@ -1,9 +1,9 @@
 {
-  "name": "com.bedtime.tree-view-collapser",
-  "displayName": "Tree View Collapser",
+  "name": "com.bedtime.fast-flatten",
+  "displayName": "FastFlatten: Hierarchy Collapser",
   "version": "1.1.0",
   "author": {
     "name": "Bedtime Digital Games",
-    "url": "https://github.com/BedtimeDigitalGames/TreeViewCollapser.git"
+    "url": "https://github.com/BedtimeDigitalGames/FastFlatten.git"
   }
 }

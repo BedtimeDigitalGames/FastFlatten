@@ -1,40 +1,27 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using BedtimeCore.Reflection;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
-using UnityEngine;
 
 namespace BedtimeCore.Editor
 {
-	[InitializeOnLoad]
 	public static class TreeViewCollapser
 	{
-		private static readonly Type hierarchyType = ReflectionUtility.GetType("UnityEditor.SceneHierarchyWindow");
-		private static readonly HashSet<int> selectionParents = new HashSet<int>();
-
-		private static Color HiddenSelectionColor => EditorGUIUtility.isProSkin ? new Color(0.9f, 0.3f, 0.3f, 0.1f) : new Color(0.9f, 0.2f, 0.6f, 0.2f);
+		private static readonly FieldInfo _assetTreeField;
+		private static readonly FieldInfo _folderTreeField;
 
 		static TreeViewCollapser()
 		{
-			EditorApplication.hierarchyWindowItemOnGUI += HandleHierarchyItemGUI;
-			Selection.selectionChanged += HandleSelectionChanged;
-			HandleSelectionChanged();
+			var projectBrowserType = typeof(ProjectBrowser);			
+			_assetTreeField = projectBrowserType.GetField("m_AssetTree", BindingFlags.Instance | BindingFlags.NonPublic);
+			_folderTreeField = projectBrowserType.GetField("m_FolderTree", BindingFlags.Instance | BindingFlags.NonPublic);
 		}
+		
+		[MenuItem("BedtimeCore/Selection/Collapse Focused Hierarchy %g")]
+		private static void CollapseHierarchy() => CollapseHierarchy(EditorWindow.focusedWindow);
 
-		public static void CollapseSelection()
-		{
-			CollapseTransform(Selection.transforms);
-		}
-
-		public static void CollapseHierarchy()
-		{
-			CollapseHierarchy(EditorWindow.focusedWindow);
-		}
-
-		public static void CollapseHierarchy(EditorWindow window)
+		private static void CollapseHierarchy(EditorWindow window)
 		{
 			if (window == null)
 			{
@@ -50,44 +37,22 @@ namespace BedtimeCore.Editor
 			}
 		}
 
-		public static void CollapseTransform(params Transform[] toCollapse)
-		{
-			CollapseID(toCollapse.Select(t => t.gameObject.GetInstanceID()).ToArray());
-		}
-
-		public static void CollapseID(params int[] toCollapse)
-		{
-			foreach (object view in GetHierarchyViews())
-			{
-				var data = view.GetValue<object>("data");
-
-				foreach (int item in toCollapse)
-				{
-					TreeViewItem treeItem = data.InvokeMethod<TreeViewItem, int>("FindItem", item);
-					if (treeItem != null)
-					{
-						data.InvokeVoid("SetExpandedWithChildren", treeItem, false);
-					}
-				}
-			}
-		}
-
 		private static void CollapseTreeView(EditorWindow focus)
 		{
-			foreach (object treeView in TreeViewHelper.GetTreeViews(focus))
+			foreach (var treeView in GetTreeViews(focus))
 			{
 				if (treeView == null)
 				{
 					continue;
 				}
-				var data = treeView.GetValue<object>("data");
-				var items = data.InvokeMethod<IList<TreeViewItem>>("GetRows");
+				var data = treeView.data;
+				var items = data.GetRows();
 
 				foreach (TreeViewItem item in items)
 				{
-					if (data.InvokeMethod<bool, TreeViewItem>("IsExpanded", item) && !IsSceneRoot(item))
+					if (data.IsExpanded(item) && !IsRoot(item))
 					{
-						data.InvokeVoid("SetExpandedWithChildren", item, false);
+						data.SetExpandedWithChildren(item, false);
 					}
 				}
 			}
@@ -95,75 +60,59 @@ namespace BedtimeCore.Editor
 			focus.Repaint();
 		}
 
-		private static bool IsSceneRoot(TreeViewItem item)
+		private static bool IsRoot(TreeViewItem item)
 		{
-			const string GAMEOBJECT_TREEVIEW_ITEM_TYPE_NAME = "GameObjectTreeViewItem";
-			const string ROOT_TREEVIEW_TYPE_NAME = "RootTreeItem";
-			string typeName = item.GetType().Name;
-			return typeName == ROOT_TREEVIEW_TYPE_NAME || typeName == GAMEOBJECT_TREEVIEW_ITEM_TYPE_NAME && item.GetValue<bool>("isSceneHeader");
-		}
-
-		private static IEnumerable<object> GetHierarchyViews()
-		{
-			var newHierarchyList = hierarchyType.GetValue<IList>("s_SceneHierarchyWindow");
-			if (newHierarchyList != null)
+			if (item is GameObjectTreeViewItem goTreeItem)
 			{
-				foreach (object item in newHierarchyList)
+				return goTreeItem.isSceneHeader;
+			}
+			if (item is AssetsTreeViewDataSource.RootTreeItem)
+			{
+				return true;
+			}
+			return false;
+		}
+		
+		private enum ProjectViewTreeView
+		{
+			AssetTree,
+			FolderTree,
+		}
+		
+		private static IEnumerable<TreeViewController> GetTreeViews(EditorWindow window)
+		{
+			if (window is SceneHierarchyWindow sceneWindow)
+			{
+				yield return sceneWindow.sceneHierarchy.treeView;
+			}
+
+			TreeViewController output;
+			if(window is ProjectBrowser projectWindow)
+			{
+				if (TryGetProjectWindowTreeView(projectWindow, ProjectViewTreeView.AssetTree, out output))
 				{
-					var tree = item.GetValue<object>("treeView");
-					if (tree != null)
-					{
-						yield return tree;
-					}
+					yield return output;
+				}
+				if (TryGetProjectWindowTreeView(projectWindow, ProjectViewTreeView.FolderTree, out output))
+				{
+					yield return output;
 				}
 			}
 		}
 
-		private static void HandleHierarchyItemGUI(int instanceID, Rect rect)
+		private static bool TryGetProjectWindowTreeView(ProjectBrowser window, ProjectViewTreeView view, out TreeViewController treeViewController)
 		{
-			var GO = EditorUtility.InstanceIDToObject(instanceID) as GameObject;
-			if (GO == null)
+			treeViewController = null;
+			switch (view)
 			{
-				return;
+				case ProjectViewTreeView.AssetTree: 
+					treeViewController = _assetTreeField.GetValue(window) as TreeViewController;
+					break;
+				case ProjectViewTreeView.FolderTree: 
+					treeViewController = _folderTreeField.GetValue(window) as TreeViewController;
+					break;
 			}
-
-			Rect blockRect = rect;
-			blockRect.x = -1000;
-			blockRect.width = 10000;
-
-			if (selectionParents.Contains(instanceID))
-			{
-				foreach (Transform transform in GO.transform)
-				{
-					if (!TreeViewHelper.IsRevealed(transform.gameObject.GetInstanceID()))
-					{
-						EditorGUI.DrawRect(blockRect, HiddenSelectionColor);
-						break;
-					}
-				}
-			}
-		}
-
-		private static void HandleSelectionChanged()
-		{
-			selectionParents.Clear();
-			foreach (GameObject selection in Selection.gameObjects)
-			{
-				foreach (int item in GetParent(selection))
-				{
-					selectionParents.Add(item);
-				}
-			}
-		}
-
-		private static IEnumerable<int> GetParent(GameObject child)
-		{
-			Transform transform = child.transform;
-			while (transform.parent != null)
-			{
-				transform = transform.parent;
-				yield return transform.gameObject.GetInstanceID();
-			}
+			return treeViewController != null;
 		}
 	}
 }

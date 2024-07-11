@@ -1,3 +1,4 @@
+[![openupm](https://img.shields.io/npm/v/com.bedtime.fast-flatten?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.bedtime.fast-flatten/)
 # FastFlatten: Hierarchy Collapser
 This package adds a new utility shortcut to the Unity editor; Collapse the currently active hierarchy!
 Normally it's easy to end up with a cluttered hierarchy after working in a scene for a while, and the same goes for the project view. 

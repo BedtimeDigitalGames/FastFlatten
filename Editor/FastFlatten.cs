@@ -27,7 +27,7 @@ namespace BedtimeCore.Editor
 				return;
 			}
 			
-			foreach (TreeViewController controller in GetTreeViewControllers(window))
+			foreach (var controller in GetTreeViewControllers(window))
 			{
 				if (controller == null)
 				{
@@ -39,7 +39,7 @@ namespace BedtimeCore.Editor
 				var selection = data.FindItem(Selection.activeInstanceID);
 				
 				int collapsedCount = 0;
-				foreach (TreeViewItem item in data.GetRows())
+				foreach (var item in data.GetRows())
 				{
 					if (data.IsExpanded(item) && !IsRoot(item))
 					{
@@ -64,7 +64,11 @@ namespace BedtimeCore.Editor
 			window.Repaint();
 		}
 
-		private static bool IsRoot(TreeViewItem item)
+#if UNITY_6000_2_OR_NEWER
+		private static bool IsRoot(TreeViewItem<int> item)
+#else
+        private static bool IsRoot(TreeViewItem item)
+#endif
 		{
 			if (item is GameObjectTreeViewItem goTreeItem)
 			{
@@ -76,8 +80,12 @@ namespace BedtimeCore.Editor
 			}
 			return false;
 		}
-
+        
+#if UNITY_6000_2_OR_NEWER
+		private static IEnumerable<TreeViewController<int>> GetTreeViewControllers(EditorWindow window)
+#else
 		private static IEnumerable<TreeViewController> GetTreeViewControllers(EditorWindow window)
+#endif
 		{
 			if (window is SceneHierarchyWindow sceneWindow)
 			{
@@ -86,7 +94,7 @@ namespace BedtimeCore.Editor
 
 			if(window is ProjectBrowser projectWindow)
 			{
-				if (TryGetProjectBrowserTreeViewController(projectWindow, ProjectBrowserTreeViewType.AssetTree, out TreeViewController output))
+				if (TryGetProjectBrowserTreeViewController(projectWindow, ProjectBrowserTreeViewType.AssetTree, out var output))
 				{
 					yield return output;
 				}
@@ -97,20 +105,37 @@ namespace BedtimeCore.Editor
 			}
 		}
 
-		private static bool TryGetProjectBrowserTreeViewController(ProjectBrowser window, ProjectBrowserTreeViewType treeViewType, out TreeViewController treeViewController)
+#if UNITY_6000_2_OR_NEWER
+		private static bool TryGetProjectBrowserTreeViewController(ProjectBrowser window, ProjectBrowserTreeViewType treeViewType, out TreeViewController<int> treeViewController)
 		{
 			treeViewController = null;
 			switch (treeViewType)
 			{
 				case ProjectBrowserTreeViewType.AssetTree: 
-					treeViewController = _assetTreeField.GetValue(window) as TreeViewController;
+					treeViewController = _assetTreeField.GetValue(window) as TreeViewController<int>;
 					break;
 				case ProjectBrowserTreeViewType.FolderTree: 
-					treeViewController = _folderTreeField.GetValue(window) as TreeViewController;
+					treeViewController = _folderTreeField.GetValue(window) as TreeViewController<int>;
 					break;
 			}
 			return treeViewController != null;
 		}
+#else
+        private static bool TryGetProjectBrowserTreeViewController(ProjectBrowser window, ProjectBrowserTreeViewType treeViewType, out TreeViewController treeViewController)
+        {
+            treeViewController = null;
+            switch (treeViewType)
+            {
+                case ProjectBrowserTreeViewType.AssetTree: 
+                    treeViewController = _assetTreeField.GetValue(window) as TreeViewController;
+                    break;
+                case ProjectBrowserTreeViewType.FolderTree: 
+                    treeViewController = _folderTreeField.GetValue(window) as TreeViewController;
+                    break;
+            }
+            return treeViewController != null;
+        }
+#endif
 
 		private enum ProjectBrowserTreeViewType
 		{

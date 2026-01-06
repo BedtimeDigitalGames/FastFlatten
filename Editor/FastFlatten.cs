@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 
@@ -64,7 +65,9 @@ namespace BedtimeCore.Editor
 			window.Repaint();
 		}
 
-#if UNITY_6000_2_OR_NEWER
+#if UNITY_6000_3_OR_NEWER
+        		private static bool IsRoot(TreeViewItem<EntityId> item)
+#elif UNITY_6000_2_OR_NEWER
 		private static bool IsRoot(TreeViewItem<int> item)
 #else
         private static bool IsRoot(TreeViewItem item)
@@ -81,7 +84,9 @@ namespace BedtimeCore.Editor
 			return false;
 		}
         
-#if UNITY_6000_2_OR_NEWER
+#if UNITY_6000_3_OR_NEWER
+        private static IEnumerable<TreeViewController<EntityId>> GetTreeViewControllers(EditorWindow window)
+#elif UNITY_6000_2_OR_NEWER
 		private static IEnumerable<TreeViewController<int>> GetTreeViewControllers(EditorWindow window)
 #else
 		private static IEnumerable<TreeViewController> GetTreeViewControllers(EditorWindow window)
@@ -105,7 +110,22 @@ namespace BedtimeCore.Editor
 			}
 		}
 
-#if UNITY_6000_2_OR_NEWER
+#if UNITY_6000_3_OR_NEWER
+		private static bool TryGetProjectBrowserTreeViewController(ProjectBrowser window, ProjectBrowserTreeViewType treeViewType, out TreeViewController<EntityId> treeViewController)
+		{
+			treeViewController = null;
+			switch (treeViewType)
+			{
+				case ProjectBrowserTreeViewType.AssetTree: 
+					treeViewController = _assetTreeField.GetValue(window) as TreeViewController<EntityId>;
+					break;
+				case ProjectBrowserTreeViewType.FolderTree: 
+					treeViewController = _folderTreeField.GetValue(window) as TreeViewController<EntityId>;
+					break;
+			}
+			return treeViewController != null;
+		}
+#elif UNITY_6000_2_OR_NEWER
 		private static bool TryGetProjectBrowserTreeViewController(ProjectBrowser window, ProjectBrowserTreeViewType treeViewType, out TreeViewController<int> treeViewController)
 		{
 			treeViewController = null;

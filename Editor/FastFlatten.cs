@@ -37,7 +37,7 @@ namespace BedtimeCore.Editor
 				
 				var data = controller.data;
 
-				var selection = data.FindItem(Selection.activeInstanceID);
+				var selection = data.FindItem(Selection.activeEntityId);
 				
 				int collapsedCount = 0;
 				foreach (var item in data.GetRows())
